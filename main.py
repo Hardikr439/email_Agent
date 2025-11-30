@@ -370,10 +370,9 @@ if __name__ == "__main__":
 
     if len(sys.argv) > 1 and sys.argv[1] == "api":
         # Run API mode
-        port = int(os.environ.get("API_PORT", 8001))
-        host = os.environ.get("API_HOST", "127.0.0.1")
-
-        uvicorn.run(app, host="0.0.0.0", port=8000)
+        # Railway requires binding to PORT environment variable
+        port = int(os.environ.get("PORT", 8000))
+        host = "0.0.0.0"  # Required for Railway
 
         print("\n" + "=" * 70)
         print("🚀 Starting FastAPI server with Masumi integration...")

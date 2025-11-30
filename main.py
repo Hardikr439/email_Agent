@@ -348,7 +348,7 @@ async def send_email_direct(email_data: DirectEmailRequest):
             "subject": email_data.subject,
             "body": email_data.body
         }
-        
+        print(input_data)
         # Execute the email task directly
         result = await execute_email_task(input_data)
         logger.info(f"Direct email task completed successfully")
@@ -425,7 +425,7 @@ if __name__ == "__main__":
         # Run API mode
         # Railway requires binding to PORT environment variable
         port = int(os.environ.get("PORT", 8004))
-        host = "localhost"  # Required for Railway
+        host = "0.0.0.0"  # Required for Railway
 
         print("\n" + "=" * 70)
         print("🚀 Starting FastAPI server with Masumi integration...")

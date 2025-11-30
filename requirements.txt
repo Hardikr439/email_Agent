@@ -8,3 +8,4 @@ httpx
 langchain 
 langchain-google-genai 
 google-generativeai
+sib-api-v3-sdk

@@ -1,12 +1,11 @@
 """
 Simple Email Sending Service
-Sends emails via SMTP
+Sends emails via Brevo API
 """
 
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 import os
+import sib_api_v3_sdk
+from sib_api_v3_sdk.rest import ApiException
 
 # Optional: LangChain + Gemini for subject/body enhancement
 try:
@@ -40,14 +39,21 @@ class EmailService:
     
     def __init__(self, logger=None):
         self.logger = logger
-        self.smtp_server = os.getenv("SMTP_SERVER", "smtp.gmail.com")
-        self.smtp_port = int(os.getenv("SMTP_PORT", "587"))
+        self.brevo_api_key = os.getenv("BREVO_API_KEY", "")
         self.sender_email = os.getenv("SENDER_EMAIL", "")
-        self.sender_password = os.getenv("SENDER_PASSWORD", "")
+        self.sender_name = os.getenv("SENDER_NAME", "Email Service")
 
         # Gemini / LangChain configuration (optional)
         self.gemini_api_key = os.getenv("GOOGLE_API_KEY", "")
         self.gemini_model_name = os.getenv("GEMINI_MODEL_NAME", "gemini-1.5-flash")
+        
+        # Initialize Brevo API configuration
+        if self.brevo_api_key:
+            configuration = sib_api_v3_sdk.Configuration()
+            configuration.api_key['api-key'] = self.brevo_api_key
+            self.api_instance = sib_api_v3_sdk.TransactionalEmailsApi(sib_api_v3_sdk.ApiClient(configuration))
+        else:
+            self.api_instance = None
 
     def _enhance_email_with_gemini(self, keypoints, original_subject: str, original_body: str):
         """Use Gemini via LangChain to turn keypoints into a subject and body.
@@ -196,40 +202,41 @@ class EmailService:
                 self.logger.error(error_msg)
             return ServiceResult(recipient_email, subject, False, error_msg)
         
-        if not self.sender_email or not self.sender_password:
-            error_msg = "SMTP credentials not configured (SENDER_EMAIL or SENDER_PASSWORD missing)"
+        if not self.brevo_api_key:
+            error_msg = "Brevo API key not configured (BREVO_API_KEY missing)"
+            if self.logger:
+                self.logger.error(error_msg)
+            return ServiceResult(recipient_email, subject, False, error_msg)
+        
+        if not self.sender_email:
+            error_msg = "Sender email not configured (SENDER_EMAIL missing)"
             if self.logger:
                 self.logger.error(error_msg)
             return ServiceResult(recipient_email, subject, False, error_msg)
         
         try:
-            # Create message
-            msg = MIMEMultipart()
-            msg["From"] = self.sender_email
-            msg["To"] = recipient_email
-            msg["Subject"] = subject
-            msg.attach(MIMEText(body, "plain"))
+            # Create Brevo email object
+            sender = {"name": self.sender_name, "email": self.sender_email}
+            to = [{"email": recipient_email}]
             
-            # Connect and send
-            with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
-                server.starttls()
-                server.login(self.sender_email, self.sender_password)
-                server.send_message(msg)
+            send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(
+                to=to,
+                sender=sender,
+                subject=subject,
+                text_content=body
+            )
             
-            success_msg = f"Email sent successfully to {recipient_email}"
+            # Send email via Brevo API
+            api_response = self.api_instance.send_transac_email(send_smtp_email)
+            
+            success_msg = f"Email sent successfully to {recipient_email} (Message ID: {api_response.message_id})"
             if self.logger:
                 self.logger.info(success_msg)
             
             return ServiceResult(recipient_email, subject, True, success_msg)
         
-        except smtplib.SMTPAuthenticationError as e:
-            error_msg = "SMTP authentication failed - check SENDER_EMAIL and SENDER_PASSWORD"
-            if self.logger:
-                self.logger.error(f"{error_msg}: {str(e)}")
-            return ServiceResult(recipient_email, subject, False, error_msg)
-        
-        except smtplib.SMTPException as e:
-            error_msg = f"SMTP error: {str(e)}"
+        except ApiException as e:
+            error_msg = f"Brevo API error: {str(e)}"
             if self.logger:
                 self.logger.error(error_msg)
             return ServiceResult(recipient_email, subject, False, error_msg)

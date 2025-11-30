@@ -316,7 +316,60 @@ async def input_schema():
     }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 6) Health Check
+# 6) Direct Email Service (Without Masumi Payment)
+# ─────────────────────────────────────────────────────────────────────────────
+class DirectEmailRequest(BaseModel):
+    recipient_email: str = Field(..., description="Email address of the recipient")
+    subject: str = Field(..., description="Subject line of the email")
+    body: str = Field(..., description="Body content of the email")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "recipient_email": "user@example.com",
+                "subject": "Test Email Subject",
+                "body": "This is the email body content"
+            }
+        }
+
+@app.post("/send_email")
+async def send_email_direct(email_data: DirectEmailRequest):
+    """
+    Sends an email directly without Masumi payment integration.
+    This endpoint bypasses the payment system and executes the email task immediately.
+    """
+    try:
+        logger.info(f"Received direct email request to: {email_data.recipient_email}")
+        logger.info(f"Subject: {email_data.subject}")
+        
+        # Convert Pydantic model to dict for the email service
+        input_data = {
+            "recipient_email": email_data.recipient_email,
+            "subject": email_data.subject,
+            "body": email_data.body
+        }
+        
+        # Execute the email task directly
+        result = await execute_email_task(input_data)
+        logger.info(f"Direct email task completed successfully")
+        
+        # Extract result string
+        result_string = result.raw if hasattr(result, "raw") else str(result)
+        
+        return {
+            "status": "success",
+            "message": "Email sent successfully",
+            "result": result_string
+        }
+    except Exception as e:
+        logger.error(f"Error in send_email_direct: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to send email: {str(e)}"
+        )
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 7) Health Check
 # ─────────────────────────────────────────────────────────────────────────────
 @app.get("/health")
 async def health():
@@ -371,8 +424,8 @@ if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "api":
         # Run API mode
         # Railway requires binding to PORT environment variable
-        port = int(os.environ.get("PORT", 8000))
-        host = "0.0.0.0"  # Required for Railway
+        port = int(os.environ.get("PORT", 8004))
+        host = "localhost"  # Required for Railway
 
         print("\n" + "=" * 70)
         print("🚀 Starting FastAPI server with Masumi integration...")

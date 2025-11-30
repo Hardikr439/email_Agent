@@ -373,6 +373,8 @@ if __name__ == "__main__":
         port = int(os.environ.get("API_PORT", 8001))
         host = os.environ.get("API_HOST", "127.0.0.1")
 
+        uvicorn.run(app, host="0.0.0.0", port=8000)
+
         print("\n" + "=" * 70)
         print("🚀 Starting FastAPI server with Masumi integration...")
         print("=" * 70)
